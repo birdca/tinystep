@@ -29,16 +29,15 @@ def show_onboarding():
 目前系統處於全新乾淨狀態，尚未建立任何身分與任務。
 
 [bold cyan]💡 你可以透過以下方式開始：[/bold cyan]
-  1. [bold yellow]🤖 智慧引導模式（最推薦）：[/bold yellow]
+  1. [bold yellow]🤖 智慧引導初始化（最推薦）：[/bold yellow]
      直接輸入你想做的目標與任務清單，由 Agent 自動拆解出身分認同、阻力係數與兩分鐘降級版本：
      [white]tinystep init -i[/white]
 
-  2. [bold yellow]📦 載入範本體驗 (運動/閱讀/反思)：[/bold yellow]
-     [white]tinystep init --template general[/white]
+  2. [bold yellow]➕ 隨時新增單一目標 (Agent 智慧解析)：[/bold yellow]
+     [white]tinystep add "每天慢跑 30分鐘"[/white] 或直接輸入 [white]tinystep add[/white] 啟動互動精靈
 
-  3. [bold yellow]🛠️ 手動從零建立身分與習慣：[/bold yellow]
-     • 新增身分：[white]tinystep add-identity writer "作家" --statement "我每天堅持閱讀與寫作"[/white]
-     • 新增任務：[white]tinystep add morning_write "晨間寫作 300 字" --minutes 25 --identity writer[/white]
+  3. [bold yellow]📦 載入範本體驗 (運動/閱讀/反思)：[/bold yellow]
+     [white]tinystep init --template general[/white]
 
 隨時輸入 [bold cyan]tinystep --help[/bold cyan] 查看完整指令。
 """
@@ -148,7 +147,7 @@ def show_identities(args):
     storage = Storage()
     identities = storage.get_identities()
     if not identities:
-        console.print("[yellow]目前尚未建立任何身分認同。可使用 `tinystep add-identity` 新增！[/yellow]")
+        console.print("[yellow]目前尚未建立任何身分認同。可使用 `tinystep add-identity` 或 `tinystep add` 新增！[/yellow]")
         return
     table = Table(title="🗳️ 身分認同票箱 (Identity Board)", box=box.ROUNDED)
     table.add_column("身分代號", style="cyan")
@@ -164,7 +163,7 @@ def show_stack(args):
     storage = Storage()
     tasks = storage.get_tasks()
     if not tasks:
-        console.print("[yellow]目前尚未建立任何習慣任務。[/yellow]")
+        console.print("[yellow]目前尚未建立任何習慣任務。可使用 `tinystep add` 新增！[/yellow]")
         return
     console.print(Panel(
         "《原子習慣》第一法則：讓提示顯而易見 (Make it Obvious)。\n將新習慣綁定在已有舊習慣後面，大腦最不需要消耗意志力！",
@@ -215,24 +214,96 @@ def audit_overestimation(args):
     console.print(Panel(report, title="📊 [bold magenta]過度預估診斷報告 (Capacity Audit)[/bold magenta]", border_style="cyan"))
 
 def add_task(args):
+    """新增任務：支援自然語言輸入、Agent 智慧推導身分與原子習慣，亦相容手動參數"""
     storage = Storage()
-    new_task = HabitTask(
-        id=args.id,
-        title=args.title,
-        identity_id=args.identity or "",
-        estimated_minutes=args.minutes,
-        friction_weight=args.friction,
-        habit_stack_anchor=args.anchor or "完成日常例行公事時",
-        two_minute_rule=args.mvh or f"打開 {args.title} 相關工具或介面 (2分鐘)",
-        schedule_days=["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        is_core_daily=args.core
-    )
-    if storage.add_task(new_task):
-        console.print(f"[bold green]✅ 成功新增任務 【{escape(args.id)}】：{args.title} ({args.minutes} 分鐘)！[/bold green]")
-        if args.identity and not any(i.id == args.identity for i in storage.get_identities()):
-            console.print(f"[dim yellow]提示：身分 ID '{escape(args.identity)}' 尚未建立，建議輸入 `tinystep add-identity {escape(args.identity)} '名稱'` 建立身分認同。[/dim yellow]")
-    else:
-        console.print(f"[bold red]❌ 任務 ID '{escape(args.id)}' 已經存在！[/bold red]")
+    existing_identities = {i.id: i for i in storage.get_identities()}
+    existing_tasks = {t.id: t for t in storage.get_tasks()}
+
+    raw_goal = " ".join(args.goal).strip() if getattr(args, "goal", None) else None
+
+    # 若未提供任何目標參數，且非指定 flags，啟動互動精靈
+    if not raw_goal and not getattr(args, "id", None):
+        console.print(Panel("""[bold green]🤖 TinyStep Agent 智慧目標新增精靈[/bold green]
+你可以直接輸入你想新增的目標或每日任務，Agent 會自動為你：
+  ✨ 提煉/關聯對應的[bold cyan]「理想身分認同 (Identity)」[/bold cyan]
+  ⏱️ 自動解析預估專注時間與認知阻力
+  🔗 自動生成[bold yellow]「習慣堆疊錨點」[/bold yellow]與[bold magenta]「兩分鐘微步 (2-Min Rule)」[/bold magenta]
+""", title="➕ [bold]新增原子習慣[/bold]", border_style="cyan"))
+        raw_goal = console.input("[bold yellow]請輸入你想新增的目標或任務（例如：每天慢跑 30分鐘、閱讀 20 頁）：[/bold yellow] ").strip()
+        if not raw_goal:
+            console.print("[yellow]未輸入任何內容，取消新增。[/yellow]")
+            return
+
+    # 使用 auto_builder 自動推導
+    new_identities, new_tasks = build_from_goal_text(raw_goal)
+    if not new_tasks:
+        console.print("[bold red]❌ 無法從輸入文字中解析出有效任務。[/bold red]")
+        return
+
+    # 若使用者在命令列手動覆寫特定屬性
+    for t in new_tasks:
+        if args.minutes is not None:
+            t.estimated_minutes = args.minutes
+        if args.friction is not None:
+            t.friction_weight = args.friction
+        if args.identity:
+            t.identity_id = args.identity
+        if args.anchor:
+            t.habit_stack_anchor = args.anchor
+        if args.mvh:
+            t.two_minute_rule = args.mvh
+        if args.core:
+            t.is_core_daily = True
+
+        # 避免 task_id 與現有任務衝突
+        base_id = t.id
+        counter = 1
+        while t.id in existing_tasks:
+            t.id = f"{base_id}_{counter}"
+            counter += 1
+
+    # 預覽表格
+    table = Table(title=f"✨ Agent 智慧推導新增清單 (共 {len(new_tasks)} 項任務)", box=box.ROUNDED)
+    table.add_column("任務 ID", style="cyan")
+    table.add_column("任務名稱", style="white")
+    table.add_column("對應理想身分", style="bold green")
+    table.add_column("時長/阻力", justify="right")
+    table.add_column("習慣堆疊錨點", style="yellow")
+    table.add_column("兩分鐘微步 (2-Min Rule)", style="italic magenta")
+
+    for t in new_tasks:
+        # 查看身分名稱
+        matched_iden = existing_identities.get(t.identity_id)
+        if not matched_iden:
+            for ni in new_identities:
+                if ni.id == t.identity_id:
+                    matched_iden = ni
+                    break
+        iden_name = matched_iden.name if matched_iden else "自律實踐者"
+        table.add_row(
+            t.id,
+            t.title,
+            iden_name,
+            f"{t.estimated_minutes}m / {t.friction_weight}",
+            t.habit_stack_anchor,
+            t.two_minute_rule
+        )
+
+    console.print(table)
+
+    # 存入 storage
+    added_count = 0
+    for ni in new_identities:
+        if ni.id not in existing_identities:
+            storage.add_identity(ni)
+            console.print(f"✨ 自動建立理想身分：[bold cyan]【{escape(ni.name)}】[/bold cyan] ({ni.statement})")
+
+    for t in new_tasks:
+        if storage.add_task(t):
+            added_count += 1
+
+    console.print(f"\n[bold green]🎉 成功加入 {added_count} 項原子習慣！正在即時重新計算今日產能負荷：[/bold green]\n")
+    show_plan(argparse.Namespace(hours=None, all=False))
 
 def remove_task(args):
     storage = Storage()
@@ -269,10 +340,10 @@ def clear_all(args):
             return
     storage.clear_all()
     console.print("[bold green]✨ 已成功清空所有個人化目標與身分！系統已恢復乾淨初始狀態。[/bold green]")
-    console.print("[dim]隨時可透過 `tinystep init -i` 載入目標，或 `tinystep init --template <名稱>` 套用範本。[/dim]")
+    console.print("[dim]隨時可透過 `tinystep init -i` 載入目標，或 `tinystep add` 建立新習慣。[/dim]")
 
 def interactive_wizard(prefilled_text: str = None):
-    """引導式對話精靈：接收目標清單並自動推導身分與原子習慣"""
+    """引導式對話精靈：接收目標清單並自動推導身分與原子習慣 (初始化全系統)"""
     console.print(Panel("""[bold green]🤖 歡迎使用 TinyStep 智慧習慣引導精靈！[/bold green]
 
 你可以直接輸入一組目前的目標與想做的任務清單，Agent 會自動為你：
@@ -311,7 +382,6 @@ def interactive_wizard(prefilled_text: str = None):
         console.print("[red]❌ 無法從輸入文字中解析出有效任務。請重新嘗試！[/red]")
         return
 
-    # 預覽產生結果
     preview_table = Table(title=f"✨ 系統自動拆解成果預覽 (共提煉 {len(identities)} 個身分、{len(tasks)} 項原子任務)", box=box.ROUNDED)
     preview_table.add_column("任務代號", style="cyan")
     preview_table.add_column("任務名稱", style="white")
@@ -337,7 +407,6 @@ def interactive_wizard(prefilled_text: str = None):
     confirm = console.input("\n[bold cyan]是否確認將這組身分與任務建立至 TinyStep 系統？ [Y/n]: [/bold cyan]")
     if confirm.strip().lower() in ["", "y", "yes"]:
         storage = Storage()
-        # 清空舊設定並匯入新設定
         storage.clear_all()
         template_data = {
             "identities": [vars(i) for i in identities],
@@ -349,8 +418,25 @@ def interactive_wizard(prefilled_text: str = None):
     else:
         console.print("[yellow]已取消儲存。[/yellow]")
 
+def load_template_by_name(template_name: str):
+    storage = Storage()
+    examples_dir = Path(__file__).resolve().parent.parent / "examples"
+    available = [f.stem for f in examples_dir.glob("*.json")] if examples_dir.exists() else []
+    template_file = examples_dir / f"{template_name}.json"
+    if not template_file.exists():
+        console.print(f"[bold red]❌ 找不到範本檔案: {template_name}[/bold red]")
+        if available:
+            console.print(f"目前可選範本：{', '.join(f'[cyan]{t}[/cyan]' for t in available)}")
+        return
+    with open(template_file, "r", encoding="utf-8") as f:
+        template_data = json.load(f)
+    storage.load_from_dict(template_data)
+    console.print(f"[bold green]🎉 成功載入範本：{template_name}！[/bold green]")
+    show_plan(argparse.Namespace(hours=None, all=False))
+
 def init_system(args):
     storage = Storage()
+
     # 如果指定了 --text
     if getattr(args, "text", None):
         interactive_wizard(prefilled_text=args.text)
@@ -363,20 +449,7 @@ def init_system(args):
 
     # 如果指定了 --template
     if getattr(args, "template", None):
-        template_name = args.template
-        examples_dir = Path(__file__).resolve().parent.parent / "examples"
-        available = [f.stem for f in examples_dir.glob("*.json")] if examples_dir.exists() else []
-        template_file = examples_dir / f"{template_name}.json"
-        if not template_file.exists():
-            console.print(f"[bold red]❌ 找不到範本檔案: {template_name}[/bold red]")
-            if available:
-                console.print(f"目前可選範本：{', '.join(f'[cyan]{t}[/cyan]' for t in available)}")
-            return
-        with open(template_file, "r", encoding="utf-8") as f:
-            template_data = json.load(f)
-        storage.load_from_dict(template_data)
-        console.print(f"[bold green]🎉 成功載入範本：{template_name}！[/bold green]")
-        show_plan(argparse.Namespace(hours=None, all=False))
+        load_template_by_name(args.template)
         return
 
     # 如果指定了 --clean
@@ -401,8 +474,7 @@ def init_system(args):
         available = [f.stem for f in examples_dir.glob("*.json")] if examples_dir.exists() else ["general"]
         console.print(f"可選範本：{', '.join(f'[cyan]{t}[/cyan]' for t in available)}")
         tmpl = console.input(f"請輸入範本名稱 (預設 general): ").strip() or "general"
-        args.template = tmpl
-        init_system(args)
+        load_template_by_name(tmpl)
     elif choice == "3":
         storage.clear_all()
         console.print("[bold green]🌱 已初始化乾淨空白系統！[/bold green]")
@@ -481,15 +553,15 @@ def main():
     # audit
     subparsers.add_parser("audit", help="動態過度預估審查報告 (評估當前所有任務之總負荷)")
 
-    # add
-    add_parser = subparsers.add_parser("add", help="新增客製任務")
-    add_parser.add_argument("id", type=str, help="任務 ID (例如 morning_run)")
-    add_parser.add_argument("title", type=str, help="任務名稱")
-    add_parser.add_argument("--minutes", type=int, default=30, help="預估時間 (分鐘)")
-    add_parser.add_argument("--friction", type=float, default=1.2, help="阻力係數 (1.0~1.5)")
-    add_parser.add_argument("--identity", type=str, default="", help="對應身分代號")
-    add_parser.add_argument("--anchor", type=str, default=None, help="習慣堆疊錨點")
-    add_parser.add_argument("--mvh", type=str, default=None, help="兩分鐘微步降級版本")
+    # add (支援自然語言、Agent 智慧推導身分與任務，亦支援手動參數)
+    add_parser = subparsers.add_parser("add", help="新增原子習慣 (支援 Agent 自然語言解析與身分自動建立)")
+    add_parser.add_argument("goal", nargs="*", help="自然語言目標或任務描述 (例如 '每天慢跑 30分鐘')，留空則啟動互動精靈")
+    add_parser.add_argument("--interactive", "-i", action="store_true", help="啟動對話式精靈新增")
+    add_parser.add_argument("--minutes", type=int, default=None, help="手動指定預估時間 (分鐘)")
+    add_parser.add_argument("--friction", type=float, default=None, help="手動指定阻力係數 (1.0~1.5)")
+    add_parser.add_argument("--identity", type=str, default=None, help="手動指定身分代號")
+    add_parser.add_argument("--anchor", type=str, default=None, help="手動指定習慣堆疊錨點")
+    add_parser.add_argument("--mvh", type=str, default=None, help="手動指定兩分鐘微步版本")
     add_parser.add_argument("--core", action="store_true", help="是否為每日必做核心習慣")
 
     # remove
