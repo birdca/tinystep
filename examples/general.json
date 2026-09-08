@@ -1,0 +1,63 @@
+{
+  "identities": [
+    {
+      "id": "reader",
+      "name": "深度思考者 (Deep Reader)",
+      "statement": "我是一個每日沉浸於好書、持續汲取前人智慧的終身學習者。",
+      "votes": 0
+    },
+    {
+      "id": "athlete",
+      "name": "活力運動員 (Disciplined Athlete)",
+      "statement": "我是一個重視身體能量管理、每天堅持活動筋骨的自律者。",
+      "votes": 0
+    },
+    {
+      "id": "writer",
+      "name": "洞察記錄者 (Clarity Writer)",
+      "statement": "我是一個透過書寫釐清思維、每天記錄個人思考的觀察家。",
+      "votes": 0
+    }
+  ],
+  "tasks": [
+    {
+      "id": "reading",
+      "title": "專注閱讀非虛構好書 20 頁",
+      "identity_id": "reader",
+      "estimated_minutes": 30,
+      "friction_weight": 1.1,
+      "habit_stack_anchor": "睡前將手機移到書桌充電並躺上床時",
+      "two_minute_rule": "翻開床頭書讀完 1 頁 (2分鐘)",
+      "schedule_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      "is_core_daily": true,
+      "is_downscaled": false,
+      "completed": false
+    },
+    {
+      "id": "workout",
+      "title": "晨間有氧慢跑或重訓 40 分鐘",
+      "identity_id": "athlete",
+      "estimated_minutes": 40,
+      "friction_weight": 1.3,
+      "habit_stack_anchor": "早上起床換好運動服並穿上跑鞋時",
+      "two_minute_rule": "繫上鞋帶並走到戶外散步 2 分鐘",
+      "schedule_days": ["Mon", "Wed", "Fri", "Sat"],
+      "is_core_daily": false,
+      "is_downscaled": false,
+      "completed": false
+    },
+    {
+      "id": "journaling",
+      "title": "寫下今日 3 件感恩與覆盤反思",
+      "identity_id": "writer",
+      "estimated_minutes": 15,
+      "friction_weight": 1.0,
+      "habit_stack_anchor": "晚上刷牙洗臉回到書桌前",
+      "two_minute_rule": "打開筆記本寫下 1 句話 (2分鐘)",
+      "schedule_days": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      "is_core_daily": true,
+      "is_downscaled": false,
+      "completed": false
+    }
+  ]
+}
