@@ -50,6 +50,7 @@ def show_plan(args):
     identities = {i.id: i for i in storage.get_identities()}
     today_name = get_day_name()
     today_str = datetime.now().strftime("%Y-%m-%d (%a)")
+    streak = storage.calculate_streak()
 
     if not tasks:
         show_onboarding()
@@ -74,7 +75,7 @@ def show_plan(args):
     meter_str = "█" * meter_bars + "░" * max(0, 20 - meter_bars)
 
     summary_text = Text()
-    summary_text.append(f"📅 日期：{today_str}  |  可支配專注時數：{hours} 小時\n", style="bold")
+    summary_text.append(f"📅 日期：{today_str}  |  可支配專注時數：{hours} 小時  |  🔥 連續打卡：{streak} 天\n", style="bold")
     summary_text.append(f"📊 負荷指標：[{meter_str}] {int(plan.load_ratio * 100)}% ({plan.capacity_status})\n", style=status_color)
     summary_text.append(f"⏱️ 原始預估：{plan.raw_minutes} 分鐘  ➔  校正後總負荷（含阻力與 1.4x 緩衝）：{plan.buffered_minutes} 分鐘\n")
     summary_text.append(f"🔄 認知切換耗損：{plan.context_switch_penalty_minutes} 分鐘  ➔  等效專注總時數：{round(plan.total_effective_minutes / 60, 1)} 小時\n")
@@ -146,10 +147,11 @@ def check_task(args):
 def show_identities(args):
     storage = Storage()
     identities = storage.get_identities()
+    streak = storage.calculate_streak()
     if not identities:
         console.print("[yellow]目前尚未建立任何身分認同。可使用 `tinystep add-identity` 或 `tinystep add` 新增！[/yellow]")
         return
-    table = Table(title="🗳️ 身分認同票箱 (Identity Board)", box=box.ROUNDED)
+    table = Table(title=f"🗳️ 身分認同票箱 (Identity Board)  |  🔥 連續打卡：{streak} 天", box=box.ROUNDED)
     table.add_column("身分代號", style="cyan")
     table.add_column("理想身分定義", style="bold white")
     table.add_column("認同宣言 (Identity Statement)", style="italic")
@@ -157,6 +159,27 @@ def show_identities(args):
 
     for i in identities:
         table.add_row(i.id, i.name, i.statement, str(i.votes))
+    console.print(table)
+
+def show_history(args):
+    storage = Storage()
+    data = storage.load()
+    history = data.get("history", {})
+    streak = storage.calculate_streak()
+    if not history:
+        console.print("[yellow]目前尚無歷史封存紀錄。持續打卡到明天就會自動生成歷史報告！[/yellow]")
+        return
+    table = Table(title=f"📜 歷史每日打卡紀錄 (目前連續打卡：{streak} 天)", box=box.ROUNDED)
+    table.add_column("日期", style="cyan")
+    table.add_column("完成狀況", justify="center")
+    table.add_column("完成項目清單", style="green")
+    table.add_column("微步降級項目", style="yellow")
+    for d, record in sorted(history.items(), reverse=True):
+        completed = ", ".join(record.get("completed", [])) or "無"
+        downscaled = ", ".join(record.get("downscaled", [])) or "無"
+        total = record.get("total_tasks", 0)
+        c_count = record.get("completion_count", 0)
+        table.add_row(d, f"{c_count} / {total} 項完成", completed, downscaled)
     console.print(table)
 
 def show_stack(args):
@@ -234,13 +257,11 @@ def add_task(args):
             console.print("[yellow]未輸入任何內容，取消新增。[/yellow]")
             return
 
-    # 使用 auto_builder 自動推導
     new_identities, new_tasks = build_from_goal_text(raw_goal)
     if not new_tasks:
         console.print("[bold red]❌ 無法從輸入文字中解析出有效任務。[/bold red]")
         return
 
-    # 若使用者在命令列手動覆寫特定屬性
     for t in new_tasks:
         if args.minutes is not None:
             t.estimated_minutes = args.minutes
@@ -255,14 +276,12 @@ def add_task(args):
         if args.core:
             t.is_core_daily = True
 
-        # 避免 task_id 與現有任務衝突
         base_id = t.id
         counter = 1
         while t.id in existing_tasks:
             t.id = f"{base_id}_{counter}"
             counter += 1
 
-    # 預覽表格
     table = Table(title=f"✨ Agent 智慧推導新增清單 (共 {len(new_tasks)} 項任務)", box=box.ROUNDED)
     table.add_column("任務 ID", style="cyan")
     table.add_column("任務名稱", style="white")
@@ -272,7 +291,6 @@ def add_task(args):
     table.add_column("兩分鐘微步 (2-Min Rule)", style="italic magenta")
 
     for t in new_tasks:
-        # 查看身分名稱
         matched_iden = existing_identities.get(t.identity_id)
         if not matched_iden:
             for ni in new_identities:
@@ -291,7 +309,6 @@ def add_task(args):
 
     console.print(table)
 
-    # 存入 storage
     added_count = 0
     for ni in new_identities:
         if ni.id not in existing_identities:
@@ -540,6 +557,9 @@ def main():
     # identities
     subparsers.add_parser("identities", help="檢視身分認同得票箱")
 
+    # history
+    subparsers.add_parser("history", help="檢視歷史每日打卡紀錄與連續天數")
+
     # add-identity
     add_iden_p = subparsers.add_parser("add-identity", help="新增理想身分認同")
     add_iden_p.add_argument("id", type=str, help="身分代號 (例如 writer, athlete)")
@@ -583,6 +603,13 @@ def main():
     imp_p = subparsers.add_parser("import", help="從 JSON 檔案匯入習慣與身分設定")
     imp_p.add_argument("filepath", type=str, help="匯入檔案路徑")
 
+    # 全域跨日檢查：每次執行任何指令時，自動比對日期並自動歸檔昨日紀錄、重置今日任務
+    storage = Storage()
+    rolled_date = storage.check_and_rollover_day()
+    if rolled_date:
+        console.print(f"[bold cyan]🌅 新的一天已開啟（今日：{datetime.now().strftime('%Y-%m-%d')}）！[/bold cyan]")
+        console.print(f"[dim]昨日 ({rolled_date}) 打卡紀錄已自動封存至歷史。今日任務已重置為全新待辦，開始為身分投票吧！[/dim]\n")
+
     if len(sys.argv) == 1:
         args = parser.parse_args(["plan"])
         show_plan(args)
@@ -600,6 +627,8 @@ def main():
         restore_task(args)
     elif args.subcommand == "identities":
         show_identities(args)
+    elif args.subcommand == "history":
+        show_history(args)
     elif args.subcommand == "add-identity":
         add_identity(args)
     elif args.subcommand == "remove-identity":
@@ -622,7 +651,7 @@ def main():
         import_data(args)
     elif args.subcommand == "reset":
         Storage().reset_daily_progress()
-        console.print("[bold green]🔄 今日打卡進度已重置。[/bold green]")
+        console.print("[bold green]🔄 今日打卡進度已手動重置。[/bold green]")
         show_plan(argparse.Namespace(hours=None, all=False))
     else:
         parser.print_help()

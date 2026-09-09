@@ -21,7 +21,10 @@
    * 嚴格落實 **70% 可持續餘裕原則**，保留 30% 彈性避免意志力透支。
 4. **兩分鐘定律微步降級（The 2-Minute Rule）**：
    * 當今日負荷過高或狀態不佳時，一鍵將任務降級至「2分鐘微啟動版本」，維持「絕不連續錯過兩次」防線。
-5. **完全離線、注重隱私與可重置性**：
+5. **跨日自動封存與連續打卡追蹤（Automatic Daily Rollover & Streaks）**：
+   * 每日自動偵測跨日，將昨日進度自動封存至歷史報告（`tinystep history`），重置今日為全新待辦。
+   * 即時追蹤連續打卡天數（Streak），激勵持之以恆。
+6. **完全離線、注重隱私與可重置性**：
    * 所有設定與數據儲存在本機 `~/.tinystep/data.json`。
    * 隨時可透過 `tinystep clear` 一鍵恢復全新乾淨開局，或透過 `export` / `import` 分享範本。
 
@@ -75,7 +78,8 @@ tinystep add
 | `tinystep downscale <ID>` | 啟動兩分鐘定律微步降級（降低阻力保護打卡） | `tinystep downscale athlete` |
 | `tinystep restore <ID>` | 恢復為完整常規任務時間 | `tinystep restore athlete` |
 | `tinystep stack` | 檢視今日習慣堆疊錨點鏈（讓提示顯而易見） | `tinystep stack` |
-| `tinystep identities` | 檢視身分認同票箱累積狀況 | `tinystep identities` |
+| `tinystep identities` | 檢視身分認同票箱累積狀況與連續天數 | `tinystep identities` |
+| `tinystep history` | 檢視歷史每日打卡紀錄與連續天數 | `tinystep history` |
 | `tinystep audit` | 動態分析當前任務清單之過度預估風險報告 | `tinystep audit` |
 | `tinystep remove <ID>` | 刪除指定任務 | `tinystep remove athlete` |
 | `tinystep add-identity` | 手動新增理想身分認同宣言 | `tinystep add-identity writer "作家"` |
