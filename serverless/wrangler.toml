@@ -1,0 +1,19 @@
+name = "tinystep-bot"
+main = "src/index.js"
+compatibility_date = "2024-09-01"
+
+# KV 命名空間綁定：
+# 請先執行 npx wrangler kv namespace create TINYSTEP_KV
+# 並將產生的 id 貼至此處
+[[kv_namespaces]]
+binding = "TINYSTEP_KV"
+id = "515e4fc8caf24664954971c52c8ef941"
+
+# 環境變數設定（或可透過 npx wrangler secret put <NAME> 設定加密金鑰）：
+[vars]
+# 預設時區固定為亞洲/台北 (UTC+8)
+TIMEZONE = "Asia/Taipei"
+
+# 每日晨間自動推播：UTC 00:00 = 台灣時間 08:00 AM
+[triggers]
+crons = ["0 0 * * *"]

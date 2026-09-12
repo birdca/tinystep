@@ -24,6 +24,11 @@
 5. **跨日自動封存與連續打卡追蹤（Automatic Daily Rollover & Streaks）**：
    * 每日自動偵測跨日，將昨日進度自動封存至歷史報告（`tinystep history`），重置今日為全新待辦。
    * 即時追蹤連續打卡天數（Streak），激勵持之以恆。
+6. **📱 Telegram Bot 與 Cloudflare 零成本雲端同步 (Serverless)**：
+   * 支援透過 Telegram Bot 在手機隨時點按鈕打卡、微步降級與晨間推播。
+   * 基於 Cloudflare Workers + KV，**100% 永久免費且電腦無需開機**，Mac 與手機進度雙向同步。
+   * 每日自動偵測跨日，將昨日進度自動封存至歷史報告（`tinystep history`），重置今日為全新待辦。
+   * 即時追蹤連續打卡天數（Streak），激勵持之以恆。
 6. **完全離線、注重隱私與可重置性**：
    * 所有設定與數據儲存在本機 `~/.tinystep/data.json`。
    * 隨時可透過 `tinystep clear` 一鍵恢復全新乾淨開局，或透過 `export` / `import` 分享範本。
@@ -80,6 +85,8 @@ tinystep add
 | `tinystep stack` | 檢視今日習慣堆疊錨點鏈（讓提示顯而易見） | `tinystep stack` |
 | `tinystep identities` | 檢視身分認同票箱累積狀況與連續天數 | `tinystep identities` |
 | `tinystep history` | 檢視歷史每日打卡紀錄與連續天數 | `tinystep history` |
+| `tinystep config` | 設定 Cloudflare 雲端同步網址與金鑰 | `tinystep config --sync-url ...` |
+| `tinystep sync` | 與 Cloudflare 雲端雙向同步打卡進度 | `tinystep sync` / `tinystep sync --push` |
 | `tinystep audit` | 動態分析當前任務清單之過度預估風險報告 | `tinystep audit` |
 | `tinystep remove <ID>` | 刪除指定任務 | `tinystep remove athlete` |
 | `tinystep add-identity` | 手動新增理想身分認同宣言 | `tinystep add-identity writer "作家"` |

@@ -46,6 +46,17 @@ def show_onboarding():
 def show_plan(args):
     storage = Storage()
     profile = storage.get_profile()
+    # 嘗試從雲端同步最新狀態 (若有設定且網路暢通)
+    try:
+        from .cloud_sync import get_sync_config, pull_from_cloud
+        cfg = get_sync_config()
+        if cfg and cfg.get("auto_sync", True):
+            cloud_data = pull_from_cloud(timeout=1.5)
+            if cloud_data:
+                storage.save(cloud_data)
+    except Exception:
+        pass
+
     tasks = storage.get_tasks()
     identities = {i.id: i for i in storage.get_identities()}
     today_name = get_day_name()
@@ -520,6 +531,39 @@ def import_data(args):
     console.print(f"[bold green]📥 成功從 {in_path} 匯入資料！[/bold green]")
     show_plan(argparse.Namespace(hours=None, all=False))
 
+
+def handle_config(args):
+    from .cloud_sync import get_sync_config, save_sync_config
+    if args.sync_url or args.token:
+        cfg = get_sync_config() or {}
+        url = args.sync_url or cfg.get("sync_url", "")
+        token = args.token or cfg.get("sync_token", "")
+        save_sync_config(url, token)
+        console.print("[bold green]✅ 雲端同步設定已儲存！[/bold green]")
+        console.print(f"🔗 雲端網址：{url}")
+        console.print("[dim]提示：可執行 `tinystep sync --push` 將本機設定推至雲端。[/dim]")
+    else:
+        cfg = get_sync_config()
+        if cfg:
+            console.print("[bold cyan]☁️ 雲端同步目前設定：[/bold cyan]")
+            console.print(f"🔗 網址：{cfg.get('sync_url')}")
+            masked_token = (cfg.get('sync_token', '')[:4] + "****") if cfg.get('sync_token') else "未設定"
+            console.print(f"🔑 金鑰：{masked_token}")
+        else:
+            console.print("[yellow]尚未設定雲端同步。可使用 `tinystep config --sync-url <URL> --token <TOKEN>` 設定！[/yellow]")
+
+def handle_sync(args):
+    from .cloud_sync import sync_data
+    storage = Storage()
+    mode = "push" if args.push else ("pull" if args.pull else "auto")
+    with console.status("[bold cyan]正在與 Cloudflare 雲端同步資料...[/bold cyan]"):
+        ok, msg = sync_data(storage, mode=mode)
+    if ok:
+        console.print(f"[bold green]✅ {msg}[/bold green]")
+        show_plan(argparse.Namespace(hours=None, all=False))
+    else:
+        console.print(f"[bold red]❌ 同步失敗：{msg}[/bold red]")
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinystep",
@@ -603,6 +647,16 @@ def main():
     imp_p = subparsers.add_parser("import", help="從 JSON 檔案匯入習慣與身分設定")
     imp_p.add_argument("filepath", type=str, help="匯入檔案路徑")
 
+        # config
+    cfg_p = subparsers.add_parser("config", help="設定 Cloudflare 雲端同步與金鑰")
+    cfg_p.add_argument("--sync-url", type=str, help="Cloudflare Worker 網址 (如 https://tinystep-bot.xxx.workers.dev)")
+    cfg_p.add_argument("--token", type=str, help="雲端同步授權金鑰 (SYNC_TOKEN)")
+
+    # sync
+    sync_p = subparsers.add_parser("sync", help="與 Cloudflare 雲端雙向同步打卡進度")
+    sync_p.add_argument("--push", action="store_true", help="強制將本機設定推送至雲端")
+    sync_p.add_argument("--pull", action="store_true", help="強制自雲端拉取最新進度覆蓋本機")
+
     # 全域跨日檢查：每次執行任何指令時，自動比對日期並自動歸檔昨日紀錄、重置今日任務
     storage = Storage()
     rolled_date = storage.check_and_rollover_day()
@@ -649,6 +703,10 @@ def main():
         export_data(args)
     elif args.subcommand == "import":
         import_data(args)
+    elif args.subcommand == "config":
+        handle_config(args)
+    elif args.subcommand == "sync":
+        handle_sync(args)
     elif args.subcommand == "reset":
         Storage().reset_daily_progress()
         console.print("[bold green]🔄 今日打卡進度已手動重置。[/bold green]")

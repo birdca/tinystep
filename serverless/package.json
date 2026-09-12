@@ -1,0 +1,13 @@
+{
+  "name": "tinystep-bot",
+  "version": "0.1.0",
+  "description": "TinyStep Telegram Bot & Sync Service on Cloudflare Workers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  }
+}
