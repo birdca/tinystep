@@ -84,47 +84,68 @@ export function calculateStreak(data, tz = "Asia/Taipei") {
   return streak;
 }
 
-export function calculateCapacity(data) {
-  const profile = data.profile || {
-    daily_focus_hours: 3.5,
-    buffer_multiplier: 1.4,
-    context_switch_penalty: 15.0,
-    sustainable_limit: 0.7
-  };
-
+export function getTodayTasks(data, tz = "Asia/Taipei") {
+  const dayName = getDayName(tz);
   const tasks = data.tasks || [];
-  let rawMinutes = 0;
-  let bufferedMinutes = 0;
+  const active = tasks.filter(t => (t.schedule_days && t.schedule_days.includes(dayName)) || t.is_core_daily);
+  return active.length > 0 ? active : tasks;
+}
 
-  for (const t of tasks) {
-    const mins = t.estimated_minutes || 25;
-    const friction = t.friction_weight || t.cognitive_friction || 1.2;
-    rawMinutes += mins;
-    bufferedMinutes += mins * friction * profile.buffer_multiplier;
+export function calculateCapacity(data, tz = "Asia/Taipei") {
+  const profile = data.profile || {};
+  const dayName = getDayName(tz);
+  const isWeekend = dayName === "Sat" || dayName === "Sun";
+  const availableHours = isWeekend
+    ? (profile.default_available_hours_weekend ?? 5.0)
+    : (profile.default_available_hours_weekday ?? 3.5);
+
+  const fallacyMultiplier = profile.planning_fallacy_multiplier ?? 1.4;
+  const contextSwitchMins = profile.context_switch_minutes ?? 15;
+  const sustainableRatio = profile.sustainable_capacity_ratio ?? 0.7;
+
+  const activeTasks = getTodayTasks(data, tz);
+
+  let rawMinutes = 0;
+  let bufferedMinutes = 0.0;
+
+  for (const t of activeTasks) {
+    if (t.is_downscaled) {
+      rawMinutes += 2;
+      bufferedMinutes += 2;
+    } else {
+      const mins = t.estimated_minutes || 25;
+      const friction = t.friction_weight ?? t.cognitive_friction ?? 1.2;
+      rawMinutes += mins;
+      bufferedMinutes += mins * friction * fallacyMultiplier;
+    }
   }
 
-  const penalty = tasks.length * profile.context_switch_penalty;
-  const totalEffectiveMinutes = bufferedMinutes + penalty;
-  const availableMinutes = profile.daily_focus_hours * 60;
-  const loadRatio = availableMinutes > 0 ? totalEffectiveMinutes / availableMinutes : 0;
+  const numTasks = activeTasks.length;
+  const contextPenalty = numTasks > 0 ? numTasks * contextSwitchMins : 0;
+  const totalEffectiveMinutes = bufferedMinutes + contextPenalty;
+
+  const sustainableMinutes = availableHours * 60 * sustainableRatio;
+  const loadRatio = sustainableMinutes > 0 ? totalEffectiveMinutes / sustainableMinutes : 9.99;
 
   let status = "OPTIMAL";
   if (loadRatio > 1.0) {
     status = "OVERLOAD";
-  } else if (loadRatio > profile.sustainable_limit) {
-    status = "WARNING";
+  } else if (loadRatio > 0.75) {
+    status = "STRETCH";
   }
 
   return {
     rawMinutes: Math.round(rawMinutes),
-    bufferedMinutes: Math.round(bufferedMinutes),
-    contextSwitchPenalty: Math.round(penalty),
-    totalEffectiveMinutes: Math.round(totalEffectiveMinutes),
+    bufferedMinutes: Number(bufferedMinutes.toFixed(1)),
+    contextSwitchPenalty: Math.round(contextPenalty),
+    totalEffectiveMinutes: Number(totalEffectiveMinutes.toFixed(1)),
     totalEffectiveHours: (totalEffectiveMinutes / 60).toFixed(1),
-    availableHours: profile.daily_focus_hours,
-    sustainableLimitHours: (profile.daily_focus_hours * profile.sustainable_limit).toFixed(1),
+    availableHours: availableHours,
+    sustainableLimitHours: (availableHours * sustainableRatio).toFixed(1),
     loadRatio: Math.round(loadRatio * 100),
-    status
+    loadRatioVal: loadRatio,
+    status,
+    activeTasks
   };
 }
 
