@@ -98,7 +98,7 @@ export function calculateCapacity(data) {
 
   for (const t of tasks) {
     const mins = t.estimated_minutes || 25;
-    const friction = t.cognitive_friction || 1.2;
+    const friction = t.friction_weight || t.cognitive_friction || 1.2;
     rawMinutes += mins;
     bufferedMinutes += mins * friction * profile.buffer_multiplier;
   }

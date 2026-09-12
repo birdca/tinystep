@@ -36,12 +36,12 @@ export function renderPlanMessage(data) {
   tasks.forEach((t, idx) => {
     const statusIcon = t.completed ? "✅" : "⏳";
     const downscaleTag = t.is_downscaled ? " <i>(⚡ 微步版)</i>" : "";
-    text += `${idx + 1}. ${statusIcon} <b>${t.name}</b> (${t.estimated_minutes}m)${downscaleTag}\n`;
-    if (t.anchor) {
-      text += `   ⚓ 錨點：${t.anchor}\n`;
+    text += `${idx + 1}. ${statusIcon} <b>${t.title || t.name || t.id}</b> (${t.estimated_minutes}m)${downscaleTag}\n`;
+    if ((t.habit_stack_anchor || t.anchor)) {
+      text += `   ⚓ 錨點：${(t.habit_stack_anchor || t.anchor)}\n`;
     }
-    if (!t.completed && t.downscale_2min) {
-      text += `   👉 微步：${t.downscale_2min}\n`;
+    if (!t.completed && (t.two_minute_rule || t.downscale_2min)) {
+      text += `   👉 微步：${(t.two_minute_rule || t.downscale_2min)}\n`;
     }
     text += `\n`;
   });
@@ -58,12 +58,12 @@ export function renderPlanKeyboard(data) {
   for (const t of tasks) {
     if (t.completed) {
       keyboard.push([
-        { text: `🎉 ${t.name} (已完成)`, callback_data: `info:${t.id}` },
+        { text: `🎉 ${t.title || t.name || t.id} (已完成)`, callback_data: `info:${t.id}` },
         { text: `↩️ 撤銷`, callback_data: `restore:${t.id}` }
       ]);
     } else {
       keyboard.push([
-        { text: `✅ 打卡 ${t.name}`, callback_data: `check:${t.id}` },
+        { text: `✅ 打卡 ${t.title || t.name || t.id}`, callback_data: `check:${t.id}` },
         { text: `⚡ 微步`, callback_data: `downscale:${t.id}` }
       ]);
     }

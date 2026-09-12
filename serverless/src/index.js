@@ -99,7 +99,7 @@ export default {
           const res = checkTask(data, taskId);
           if (res) {
             await saveData(env.TINYSTEP_KV, data);
-            await sendMessage(botToken, chatId, `🎉 任務 <b>${res.task.name}</b> 已打卡完成！\n為【${res.identity ? res.identity.name : "理想身分"}】投下一票！`);
+            await sendMessage(botToken, chatId, `🎉 任務 <b>${(res.task.title || res.task.name || res.task.id)}</b> 已打卡完成！\n為【${res.identity ? res.identity.name : "理想身分"}】投下一票！`);
           } else {
             await sendMessage(botToken, chatId, `❌ 找不到任務 ID: <code>${taskId}</code>`);
           }
@@ -108,7 +108,7 @@ export default {
           const res = downscaleTask(data, taskId);
           if (res) {
             await saveData(env.TINYSTEP_KV, data);
-            await sendMessage(botToken, chatId, `⚡ 任務 <b>${res.task.name}</b> 已微步降級打卡！\n絕不連續中斷兩次！為【${res.identity ? res.identity.name : "理想身分"}】投下堅定的一票！`);
+            await sendMessage(botToken, chatId, `⚡ 任務 <b>${(res.task.title || res.task.name || res.task.id)}</b> 已微步降級打卡！\n絕不連續中斷兩次！為【${res.identity ? res.identity.name : "理想身分"}】投下堅定的一票！`);
           } else {
             await sendMessage(botToken, chatId, `❌ 找不到任務 ID: <code>${taskId}</code>`);
           }
@@ -137,7 +137,7 @@ export default {
           const res = checkTask(data, taskId);
           await saveData(env.TINYSTEP_KV, data);
 
-          const toast = res ? `🎉 ${res.task.name} 已完成打卡！` : "找不到任務";
+          const toast = res ? `🎉 ${(res.task.title || res.task.name || res.task.id)} 已完成打卡！` : "找不到任務";
           await answerCallbackQuery(botToken, query.id, toast);
 
           // 原地刷新卡片
@@ -149,7 +149,7 @@ export default {
           const res = downscaleTask(data, taskId);
           await saveData(env.TINYSTEP_KV, data);
 
-          const toast = res ? `⚡ ${res.task.name} 已啟動微步降級！` : "找不到任務";
+          const toast = res ? `⚡ ${(res.task.title || res.task.name || res.task.id)} 已啟動微步降級！` : "找不到任務";
           await answerCallbackQuery(botToken, query.id, toast);
 
           const newText = renderPlanMessage(data);
@@ -167,7 +167,7 @@ export default {
         } else if (actionData.startsWith("info:")) {
           const taskId = actionData.split(":")[1];
           const t = (data.tasks || []).find(item => item.id === taskId);
-          const info = t ? `✅「${t.name}」今日已打卡完成！` : "已完成";
+          const info = t ? `✅「${(t.title || t.name || t.id)}」今日已打卡完成！` : "已完成";
           await answerCallbackQuery(botToken, query.id, info, false);
         } else if (actionData === "refresh" || actionData === "back_to_plan") {
           await answerCallbackQuery(botToken, query.id, "已重新整理");

@@ -103,7 +103,7 @@ function calculateCapacity(data) {
 
   for (const t of tasks) {
     const mins = t.estimated_minutes || 25;
-    const friction = t.cognitive_friction || 1.2;
+    const friction = t.friction_weight || t.cognitive_friction || 1.2;
     rawMinutes += mins;
     bufferedMinutes += mins * friction * profile.buffer_multiplier;
   }
@@ -228,12 +228,12 @@ function renderPlanMessage(data) {
   tasks.forEach((t, idx) => {
     const statusIcon = t.completed ? "✅" : "⏳";
     const downscaleTag = t.is_downscaled ? " <i>(⚡ 微步版)</i>" : "";
-    text += `${idx + 1}. ${statusIcon} <b>${t.name}</b> (${t.estimated_minutes}m)${downscaleTag}\n`;
-    if (t.anchor) {
-      text += `   ⚓ 錨點：${t.anchor}\n`;
+    text += `${idx + 1}. ${statusIcon} <b>${t.title || t.name || t.id}</b> (${t.estimated_minutes}m)${downscaleTag}\n`;
+    if ((t.habit_stack_anchor || t.anchor)) {
+      text += `   ⚓ 錨點：${(t.habit_stack_anchor || t.anchor)}\n`;
     }
-    if (!t.completed && t.downscale_2min) {
-      text += `   👉 微步：${t.downscale_2min}\n`;
+    if (!t.completed && (t.two_minute_rule || t.downscale_2min)) {
+      text += `   👉 微步：${(t.two_minute_rule || t.downscale_2min)}\n`;
     }
     text += `\n`;
   });
@@ -250,12 +250,12 @@ function renderPlanKeyboard(data) {
   for (const t of tasks) {
     if (t.completed) {
       keyboard.push([
-        { text: `🎉 ${t.name} (已完成)`, callback_data: `info:${t.id}` },
+        { text: `🎉 ${t.title || t.name || t.id} (已完成)`, callback_data: `info:${t.id}` },
         { text: `↩️ 撤銷`, callback_data: `restore:${t.id}` }
       ]);
     } else {
       keyboard.push([
-        { text: `✅ 打卡 ${t.name}`, callback_data: `check:${t.id}` },
+        { text: `✅ 打卡 ${t.title || t.name || t.id}`, callback_data: `check:${t.id}` },
         { text: `⚡ 微步`, callback_data: `downscale:${t.id}` }
       ]);
     }
@@ -497,7 +497,7 @@ export default {
           const res = checkTask(data, taskId);
           if (res) {
             await saveData(env.TINYSTEP_KV, data);
-            await sendMessage(botToken, chatId, `🎉 任務 <b>${res.task.name}</b> 已打卡完成！\n為【${res.identity ? res.identity.name : "理想身分"}】投下一票！`);
+            await sendMessage(botToken, chatId, `🎉 任務 <b>${(res.task.title || res.task.name || res.task.id)}</b> 已打卡完成！\n為【${res.identity ? res.identity.name : "理想身分"}】投下一票！`);
           } else {
             await sendMessage(botToken, chatId, `❌ 找不到任務 ID: <code>${taskId}</code>`);
           }
@@ -506,7 +506,7 @@ export default {
           const res = downscaleTask(data, taskId);
           if (res) {
             await saveData(env.TINYSTEP_KV, data);
-            await sendMessage(botToken, chatId, `⚡ 任務 <b>${res.task.name}</b> 已微步降級打卡！\n絕不連續中斷兩次！為【${res.identity ? res.identity.name : "理想身分"}】投下堅定的一票！`);
+            await sendMessage(botToken, chatId, `⚡ 任務 <b>${(res.task.title || res.task.name || res.task.id)}</b> 已微步降級打卡！\n絕不連續中斷兩次！為【${res.identity ? res.identity.name : "理想身分"}】投下堅定的一票！`);
           } else {
             await sendMessage(botToken, chatId, `❌ 找不到任務 ID: <code>${taskId}</code>`);
           }
@@ -535,7 +535,7 @@ export default {
           const res = checkTask(data, taskId);
           await saveData(env.TINYSTEP_KV, data);
 
-          const toast = res ? `🎉 ${res.task.name} 已完成打卡！` : "找不到任務";
+          const toast = res ? `🎉 ${(res.task.title || res.task.name || res.task.id)} 已完成打卡！` : "找不到任務";
           await answerCallbackQuery(botToken, query.id, toast);
 
           // 原地刷新卡片
@@ -547,7 +547,7 @@ export default {
           const res = downscaleTask(data, taskId);
           await saveData(env.TINYSTEP_KV, data);
 
-          const toast = res ? `⚡ ${res.task.name} 已啟動微步降級！` : "找不到任務";
+          const toast = res ? `⚡ ${(res.task.title || res.task.name || res.task.id)} 已啟動微步降級！` : "找不到任務";
           await answerCallbackQuery(botToken, query.id, toast);
 
           const newText = renderPlanMessage(data);
@@ -565,7 +565,7 @@ export default {
         } else if (actionData.startsWith("info:")) {
           const taskId = actionData.split(":")[1];
           const t = (data.tasks || []).find(item => item.id === taskId);
-          const info = t ? `✅「${t.name}」今日已打卡完成！` : "已完成";
+          const info = t ? `✅「${(t.title || t.name || t.id)}」今日已打卡完成！` : "已完成";
           await answerCallbackQuery(botToken, query.id, info, false);
         } else if (actionData === "refresh" || actionData === "back_to_plan") {
           await answerCallbackQuery(botToken, query.id, "已重新整理");

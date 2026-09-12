@@ -1,10 +1,23 @@
 import json
+import ssl
 import urllib.request
 import urllib.error
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple
 
 CONFIG_PATH = Path.home() / ".tinystep" / "config.json"
+
+def _get_ssl_context():
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        try:
+            return ssl.create_default_context()
+        except Exception:
+            return ssl._create_unverified_context()
+
+SSL_CONTEXT = _get_ssl_context()
 
 def get_sync_config() -> Optional[Dict[str, Any]]:
     if not CONFIG_PATH.exists():
@@ -28,7 +41,7 @@ def save_sync_config(sync_url: str, sync_token: str, auto_sync: bool = True):
     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2)
 
-def pull_from_cloud(timeout: float = 3.0) -> Optional[Dict[str, Any]]:
+def pull_from_cloud(timeout: float = 4.0) -> Optional[Dict[str, Any]]:
     cfg = get_sync_config()
     if not cfg:
         return None
@@ -39,7 +52,7 @@ def pull_from_cloud(timeout: float = 3.0) -> Optional[Dict[str, Any]]:
         "User-Agent": "TinyStep-CLI/1.0"
     })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
             if resp.status == 200:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data
@@ -47,7 +60,7 @@ def pull_from_cloud(timeout: float = 3.0) -> Optional[Dict[str, Any]]:
         return None
     return None
 
-def push_to_cloud(data: Dict[str, Any], timeout: float = 3.0) -> bool:
+def push_to_cloud(data: Dict[str, Any], timeout: float = 4.0) -> bool:
     cfg = get_sync_config()
     if not cfg:
         return False
@@ -60,7 +73,7 @@ def push_to_cloud(data: Dict[str, Any], timeout: float = 3.0) -> bool:
         "User-Agent": "TinyStep-CLI/1.0"
     })
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout, context=SSL_CONTEXT) as resp:
             return resp.status == 200
     except Exception:
         return False
@@ -68,8 +81,8 @@ def push_to_cloud(data: Dict[str, Any], timeout: float = 3.0) -> bool:
 def sync_data(storage, mode: str = "auto") -> Tuple[bool, str]:
     """
     雙向同步模組：
-    - mode="pull": 強制從雲端拉取
     - mode="push": 強制推送本機至雲端
+    - mode="pull": 強制自雲端拉取
     - mode="auto": 先拉取雲端狀態；若雲端為空或初次同步，則將本機推至雲端
     """
     cfg = get_sync_config()
